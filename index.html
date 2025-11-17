@@ -15,16 +15,6 @@
   .btn-md { padding:14px 18px; border:none; border-radius:12px; cursor:pointer; font-size:18px; font-weight:800; background:#f2f2f2; }
   .btn-sm { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; background:#f2f2f2; }
   .btn-disabled { opacity:0.5; pointer-events:none; }
-  .btn-all-tagged {
-  margin-top: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid #ddd;
-  background: #222;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-}
   .spacer { flex:1 1 auto; }
   .muted { font-size:12px; color:#666; }
 
@@ -98,7 +88,7 @@
 <div class="topbar">
   <button id="undoBtn" class="btn-md" onclick="undoLast()">Undo</button>
   <button id="redoBtn" class="btn-md" onclick="redoLast()">Redo</button>
-  <button id="allTaggedBtn" class="btn-all-tagged">All Tagged</button>
+  <button id="allTaggedBtn" class="btn-md" onclick="allTagged()">All Tagged</button>
   <div class="spacer"></div>
   <span id="saveState" class="muted">Saved</span>
 </div>
@@ -249,6 +239,7 @@
     document.getElementById('undoBtn').classList.toggle('btn-disabled', S.history.length === 0);
     document.getElementById('redoBtn').classList.toggle('btn-disabled', S.future.length === 0);
 
+
     // Quick-sub prompt
     const prompt = document.getElementById('qsPrompt');
     if (subMode) {
@@ -324,6 +315,17 @@
     S.log.push(ev);
     markDirty(); persist(); render();
   }
+
+  function allTagged() {
+  // get all active (on-court) players
+  const active = S.roster.filter(n => S.players[n]?.active);
+
+  // increment tags for each active player
+  active.forEach(name => {
+    doDelta(name, 'tags', +1);
+  });
+}
+
 
   function quickSubStart(inName) { subMode = { inName }; render(); }
 
