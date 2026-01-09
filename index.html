@@ -4,17 +4,21 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
 <title>Local Stat Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --pad: 12px; }
+  :root { --pad: 12px; --font-body: 'Work Sans', system-ui, -apple-system, Arial, sans-serif; --font-head: 'Poppins', system-ui, -apple-system, Arial, sans-serif; }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: var(--pad); }
+  body { font-family: var(--font-body); margin: var(--pad); }
   h2 { margin: 8px 0; }
+  h2, h3, .name { font-family: var(--font-head); }
 
   /* Top bar: Undo/Redo + Save status */
   .topbar { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
   .btn-md { padding:14px 18px; border:none; border-radius:12px; cursor:pointer; font-size:18px; font-weight:800; background:#f2f2f2; }
   .btn-sm { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; background:#f2f2f2; }
-  .btn-huddle { background:#6f42c1; color:#fff; }
+  .btn-huddle { background: rgba(111, 66, 193, 0.18); color:#4b2a83; }
   .btn-disabled { opacity:0.5; pointer-events:none; }
   .spacer { flex:1 1 auto; }
   .muted { font-size:12px; color:#666; }
@@ -23,6 +27,8 @@
   .setup { border:1px solid #eee; border-radius:12px; padding:12px; margin-bottom:12px; background:#fafafa; }
   .setup h3 { margin-top:0; }
   textarea { width:100%; min-height:100px; padding:10px; border:1px solid #ddd; border-radius:10px; font-size:14px; }
+  .setupGrid { display:flex; gap:12px; flex-wrap:wrap; }
+  .setupCol { flex:1 1 240px; }
 
   /* On-court horizontal row */
   #oncourtColumn {
@@ -42,19 +48,20 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.03);
   }
   .nameRow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .name { font-weight: 850; font-size: 24px; }
+  .name { font-weight: 850; font-size: 22px; }
   .inlineStats { font-size:18px; color:#333; font-weight:700; }
 
   /* Action buttons: Gave/High | Got */
   .btn { padding:22px; border:none; border-radius:14px; cursor:pointer; font-size:22px; font-weight:800; width:100%; }
   .btn:active { transform: scale(0.98); }
   .btn-tag { background:#e8f7ee; }
+  .btn-tag.btn-primary { padding:26px; font-size:24px; }
   .btn-high { background:#f2f2f2; }
   .btn-defl { background:#eef2ff; border-radius:14px; }
   .btn-miss { background:#f2f2f2; }
   .bar2 {
     display:grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.2fr 0.8fr;
     gap:14px;
     align-items:stretch;
   }
@@ -62,6 +69,20 @@
     display:grid;
     grid-template-rows: 1fr 1fr;
     gap:12px;
+  }
+  .actionStackRight {
+    display:grid;
+    grid-template-rows: 1fr auto;
+    gap:12px;
+  }
+  .btn-smaction {
+    padding:10px;
+    font-size:16px;
+    border-radius:12px;
+  }
+  .btn-slim {
+    padding:16px;
+    font-size:20px;
   }
 
   /* Quick-sub prompt */
@@ -82,6 +103,9 @@
   .bench-card { background:#fff; cursor:pointer; }
   .bench-card:active { transform: scale(0.98); }
   .benchNote { font-size:12px; color:#666; margin-top:auto; }
+  .coachDockWrap { margin-top: 10px; }
+  .coachDock { display:flex; gap:12px; overflow-x:auto; padding:12px; border:1px solid #eee; border-radius:12px; background:#fafafa; }
+  .coach-card { background:#fff; }
 
   .divider { height:1px; background:#eee; margin:12px 0; }
 
@@ -99,23 +123,29 @@
 
   /* Bottom controls */
   .controls-bottom { margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap; }
-  .teamStats { margin-top: 10px; font-size:16px; font-weight:800; }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <button id="undoBtn" class="btn-md" onclick="undoLast()">Undo</button>
-  <button id="redoBtn" class="btn-md" onclick="redoLast()">Redo</button>
   <div class="spacer"></div>
   <span id="saveState" class="muted">Saved</span>
 </div>
 
 <div class="setup" id="setupPanel">
-  <h3>Roster (one name per line)</h3>
-  <textarea id="rosterInput" placeholder="Karisma&#10;Maya D&#10;Ava&#10;Diana&#10;Jojo"></textarea>
+  <div class="setupGrid">
+    <div class="setupCol">
+      <h3>Roster (one name per line)</h3>
+      <textarea id="rosterInput" placeholder="Karisma&#10;Maya D&#10;Ava&#10;Diana&#10;Jojo"></textarea>
+    </div>
+    <div class="setupCol">
+      <h3>Coaches (one name per line)</h3>
+      <textarea id="coachesInput" placeholder="Coach A&#10;Coach B"></textarea>
+    </div>
+  </div>
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
     <button class="btn-sm" onclick="saveRoster()">Save Roster</button>
+    <button class="btn-sm" onclick="saveCoaches()">Save Coaches</button>
     <button class="btn-sm" onclick="startGame()">Start Game (First 5 active)</button>
     <button class="btn-sm" onclick="exportCSV()">Export CSV</button>
     <button class="btn-sm" onclick="resetGame()">Reset Game</button>
@@ -128,12 +158,20 @@
 
 <h2>On Court</h2>
 <div id="oncourtColumn"></div>
-<button id="allTaggedBtn" class="btn-md btn-huddle" onclick="allTagged()">Huddle</button>
+<div class="topbar" style="margin-top:10px;">
+  <button id="undoBtn" class="btn-md" onclick="undoLast()">Undo</button>
+  <button id="redoBtn" class="btn-md" onclick="redoLast()">Redo</button>
+  <button id="allTaggedBtn" class="btn-md btn-huddle" onclick="allTagged()">Huddle</button>
+</div>
 
 <!-- Bench dock -->
 <div class="benchDockWrap">
   <div class="dockTitle">Bench (tap a name, then tap who comes OUT)</div>
   <div id="benchDock" class="benchDock"></div>
+</div>
+<div class="coachDockWrap">
+  <div class="dockTitle">Coaches</div>
+  <div id="coachDock" class="coachDock"></div>
 </div>
 
 <div class="divider"></div>
@@ -147,11 +185,23 @@
         <th>Player</th>
         <th>Touches</th>
         <th>High</th>
+        <th>Sm</th>
       </tr>
     </thead>
     <tbody id="totalsBody"></tbody>
   </table>
-  <div id="teamStats" class="teamStats"></div>
+  <h2>Coach Totals</h2>
+  <table class="totalsTable">
+    <thead>
+      <tr>
+        <th>Coach</th>
+        <th>Touches</th>
+        <th>High</th>
+        <th>Sm</th>
+      </tr>
+    </thead>
+    <tbody id="coachTotalsBody"></tbody>
+  </table>
 </div>
 
 <div class="controls-bottom">
@@ -165,7 +215,9 @@
 
   const defaultState = () => ({
     roster: [],                       // array of names
-    players: {},                      // name -> {tags, misses, defl, active}
+    players: {},                      // name -> {tags, misses, sm, defl, active}
+    coaches: [],                      // array of coach names
+    coachStats: {},                   // name -> {tags, misses, sm}
     huddles: 0,                       // team huddle count
     history: [],                      // undo stack (array of events)
     future: [],                       // redo stack
@@ -182,6 +234,8 @@
       // basic sanity
       obj.roster ||= [];
       obj.players ||= {};
+      obj.coaches ||= [];
+      obj.coachStats ||= {};
       obj.huddles ||= 0;
       obj.history ||= [];
       obj.future ||= [];
@@ -218,11 +272,30 @@
     const players = {};
     uniq.forEach(n => {
       const prev = S.players[n];
-      players[n] = prev ? {...prev} : { tags:0, misses:0, defl:0, active:false };
+      players[n] = prev ? {...prev} : { tags:0, misses:0, sm:0, defl:0, active:false };
     });
 
     S.roster = uniq;
     S.players = players;
+    S.history = [];
+    S.future = [];
+    markDirty(); persist(); render();
+  }
+
+  function saveCoaches() {
+    const txt = document.getElementById('coachesInput').value || '';
+    const names = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const seen = new Set();
+    const uniq = names.filter(n => { if (seen.has(n)) return false; seen.add(n); return true; });
+
+    const stats = {};
+    uniq.forEach(n => {
+      const prev = S.coachStats[n];
+      stats[n] = prev ? {...prev} : { tags:0, misses:0, sm:0 };
+    });
+
+    S.coaches = uniq;
+    S.coachStats = stats;
     S.history = [];
     S.future = [];
     markDirty(); persist(); render();
@@ -239,7 +312,8 @@
 
   function resetGame() {
     if (!confirm('Reset tags/misses/deflections and clear the court?')) return;
-    Object.values(S.players).forEach(p => { p.tags=0; p.misses=0; p.defl=0; p.active=false; });
+    Object.values(S.players).forEach(p => { p.tags=0; p.misses=0; p.sm=0; p.defl=0; p.active=false; });
+    Object.values(S.coachStats).forEach(p => { p.tags=0; p.misses=0; p.sm=0; });
     S.huddles = 0;
     S.history = [];
     S.future = [];
@@ -254,6 +328,8 @@
     // Prefill roster textarea if empty
     const ta = document.getElementById('rosterInput');
     if (!ta.value && S.roster.length) ta.value = S.roster.join('\n');
+    const ca = document.getElementById('coachesInput');
+    if (!ca.value && S.coaches.length) ca.value = S.coaches.join('\n');
 
     // Undo/redo buttons
     document.getElementById('undoBtn').classList.toggle('btn-disabled', S.history.length === 0);
@@ -279,9 +355,10 @@
     col.innerHTML = '';
     onCourt.forEach(name => {
       const p = S.players[name];
-      const tagBtn  = button('btn btn-tag', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
+      const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
       const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); doDelta(name,'misses',+1); });
-      const missBtn = button('btn btn-miss', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
+      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
+      const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doDelta(name,'sm',+1); });
       const card = div('card', {
         onclick: ()=> maybeCompleteQuickSubOut(name)
       }, [
@@ -289,7 +366,7 @@
           div('name', {}, name),
           div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
         ]),
-        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), missBtn])
+        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])])
       ]);
       col.appendChild(card);
     });
@@ -299,27 +376,47 @@
     dock.innerHTML = '';
     bench.forEach(name => {
       const p = S.players[name];
-      const tagBtn  = button('btn btn-tag', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
+      const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
       const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); doDelta(name,'misses',+1); });
-      const missBtn = button('btn btn-miss', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
+      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
+      const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doDelta(name,'sm',+1); });
       const card = div('card bench-card', { onclick: ()=>quickSubStart(name) }, [
         div('nameRow', {}, [
           div('name', {}, name),
           div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
         ]),
-        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), missBtn]),
+        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])]),
         div('benchNote', {}, 'Tap card to sub in')
       ]);
       dock.appendChild(card);
+    });
+
+    // Coaches row
+    const coachDock = document.getElementById('coachDock');
+    coachDock.innerHTML = '';
+    S.coaches.forEach(name => {
+      const p = S.coachStats[name] || { tags:0, misses:0, sm:0 };
+      const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+1); });
+      const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+2); doCoachDelta(name,'misses',+1); });
+      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+2); });
+      const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doCoachDelta(name,'sm',+1); });
+      const card = div('card coach-card', {}, [
+        div('nameRow', {}, [
+          div('name', {}, name),
+          div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
+        ]),
+        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])])
+      ]);
+      coachDock.appendChild(card);
     });
 
     // Totals table (sorted by tags desc)
     const body = document.getElementById('totalsBody');
     body.innerHTML = '';
     const rows = S.roster.map(name => {
-      const p = S.players[name] || {tags:0,misses:0,defl:0};
-      const touches = p.tags||0, high = p.misses||0;
-      return { name, touches, high };
+      const p = S.players[name] || {tags:0,misses:0,sm:0,defl:0};
+      const touches = p.tags||0, high = p.misses||0, sm = p.sm||0;
+      return { name, touches, high, sm };
     }).sort((a,b)=> b.touches - a.touches);
 
     rows.forEach(r => {
@@ -327,10 +424,48 @@
         td('totalsName', r.name),
         td('', String(r.touches)),
         td('', String(r.high)),
+        td('', String(r.sm)),
       ]));
     });
-    const teamStats = document.getElementById('teamStats');
-    teamStats.textContent = `Team Huddles: ${S.huddles || 0}`;
+    const totalsTouches = rows.reduce((sum, r) => sum + r.touches, 0);
+    const totalsHigh = rows.reduce((sum, r) => sum + r.high, 0);
+    const totalsSm = rows.reduce((sum, r) => sum + r.sm, 0);
+    body.appendChild(tr([
+      td('totalsName', 'Player Totals'),
+      td('', String(totalsTouches)),
+      td('', String(totalsHigh)),
+      td('', String(totalsSm)),
+    ]));
+    body.appendChild(tr([
+      td('totalsName', 'Team Huddles'),
+      td('', String(S.huddles || 0)),
+      td('', ''),
+      td('', ''),
+    ]));
+
+    const coachBody = document.getElementById('coachTotalsBody');
+    coachBody.innerHTML = '';
+    const coachRows = S.coaches.map(name => {
+      const p = S.coachStats[name] || { tags:0, misses:0, sm:0 };
+      return { name, touches: p.tags || 0, high: p.misses || 0, sm: p.sm || 0 };
+    }).sort((a,b)=> b.touches - a.touches);
+    coachRows.forEach(r => {
+      coachBody.appendChild(tr([
+        td('totalsName', r.name),
+        td('', String(r.touches)),
+        td('', String(r.high)),
+        td('', String(r.sm)),
+      ]));
+    });
+    const coachTotalsTouches = coachRows.reduce((sum, r) => sum + r.touches, 0);
+    const coachTotalsHigh = coachRows.reduce((sum, r) => sum + r.high, 0);
+    const coachTotalsSm = coachRows.reduce((sum, r) => sum + r.sm, 0);
+    coachBody.appendChild(tr([
+      td('totalsName', 'Team Totals'),
+      td('', String(totalsTouches + coachTotalsTouches)),
+      td('', String(totalsHigh + coachTotalsHigh)),
+      td('', String(totalsSm + coachTotalsSm)),
+    ]));
   }
 
   // ------- Actions & history (undo/redo) -------
@@ -340,6 +475,16 @@
     p[field] = Math.max(0, (Number(p[field])||0) + delta);
     // log & history
     const ev = { t:'delta', name, field, delta, ts: Date.now() };
+    S.history.push(ev);
+    S.future = [];
+    S.log.push(ev);
+    markDirty(); persist(); render();
+  }
+
+  function doCoachDelta(name, field, delta) {
+    const p = S.coachStats[name]; if (!p) return;
+    p[field] = Math.max(0, (Number(p[field])||0) + delta);
+    const ev = { t:'coach_delta', name, field, delta, ts: Date.now() };
     S.history.push(ev);
     S.future = [];
     S.log.push(ev);
@@ -391,6 +536,10 @@
       inv = { ...ev, delta: -ev.delta, ts: Date.now() };
       const p = S.players[ev.name];
       if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
+    } else if (ev.t === 'coach_delta') {
+      inv = { ...ev, delta: -ev.delta, ts: Date.now() };
+      const p = S.coachStats[ev.name];
+      if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
     } else if (ev.t === 'sub') {
       inv = { t:'sub', out: ev.in, in: ev.out, ts: Date.now() };
       const outP = S.players[ev.in], inP = S.players[ev.out];
@@ -415,6 +564,8 @@
     const ev = S.future.pop();
     if (ev.t === 'delta') {
       const p = S.players[ev.name]; if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) + ev.delta);
+    } else if (ev.t === 'coach_delta') {
+      const p = S.coachStats[ev.name]; if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) + ev.delta);
     } else if (ev.t === 'sub') {
       const outP = S.players[ev.out], inP = S.players[ev.in];
       if (outP && inP) { outP.active=false; inP.active=true; }
@@ -442,10 +593,10 @@
       return '';
     }).filter(Boolean).join('\n');
 
-    const header2 = '\n\nplayer,touches,high\n';
+    const header2 = '\n\nplayer,touches,high,sm\n';
     const rows2 = S.roster.map(name => {
-      const p = S.players[name] || {tags:0,misses:0,defl:0};
-      return `${csv(name)},${p.tags||0},${p.misses||0}`;
+      const p = S.players[name] || {tags:0,misses:0,sm:0,defl:0};
+      return `${csv(name)},${p.tags||0},${p.misses||0},${p.sm||0}`;
     }).join('\n');
 
     const csvText = header1 + rows1 + header2 + rows2 + '\n';
