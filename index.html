@@ -19,6 +19,10 @@
   .btn-md { padding:14px 18px; border:none; border-radius:12px; cursor:pointer; font-size:18px; font-weight:800; background:#f2f2f2; }
   .btn-sm { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; background:#f2f2f2; }
   .btn-huddle { background: rgba(111, 66, 193, 0.18); color:#4b2a83; }
+  .btn-quarter { background:#f4f4f4; font-weight:800; }
+  .btn-quarter.active { background:#111; color:#fff; }
+  .btn-filter { background:#f4f4f4; font-weight:700; }
+  .btn-filter.active { background:#111; color:#fff; }
   .btn-disabled { opacity:0.5; pointer-events:none; }
   .spacer { flex:1 1 auto; }
   .muted { font-size:12px; color:#666; }
@@ -164,6 +168,13 @@
 <div id="qsPrompt" class="prompt" style="display:none;"></div>
 
 <h2>On Court</h2>
+<div class="topbar" style="margin:6px 0 10px;">
+  <span class="muted" style="font-weight:700;">Quarter</span>
+  <button class="btn-sm btn-quarter" onclick="setQuarter(1)">1</button>
+  <button class="btn-sm btn-quarter" onclick="setQuarter(2)">2</button>
+  <button class="btn-sm btn-quarter" onclick="setQuarter(3)">3</button>
+  <button class="btn-sm btn-quarter" onclick="setQuarter(4)">4</button>
+</div>
 <div id="oncourtColumn"></div>
 <div class="topbar" style="margin-top:10px;">
   <button id="undoBtn" class="btn-md" onclick="undoLast()">Undo</button>
@@ -186,6 +197,14 @@
 <!-- Totals -->
 <div class="totals">
   <h2>Totals</h2>
+  <div class="topbar" style="margin:6px 0 10px;">
+    <span class="muted" style="font-weight:700;">Filter</span>
+    <button class="btn-sm btn-filter" onclick="setTotalsFilter('all')">All</button>
+    <button class="btn-sm btn-filter" onclick="setTotalsFilter(1)">Q1</button>
+    <button class="btn-sm btn-filter" onclick="setTotalsFilter(2)">Q2</button>
+    <button class="btn-sm btn-filter" onclick="setTotalsFilter(3)">Q3</button>
+    <button class="btn-sm btn-filter" onclick="setTotalsFilter(4)">Q4</button>
+  </div>
   <table class="totalsTable">
     <thead>
       <tr>
@@ -226,6 +245,9 @@
     coaches: [],                      // array of coach names
     coachStats: {},                   // name -> {tags, misses, sm}
     huddles: 0,                       // team huddle count
+    huddlesByQuarter: {},             // quarter -> count
+    activeQuarter: 1,                 // 1-4
+    totalsQuarterFilter: 'all',       // 'all' or 1-4
     history: [],                      // undo stack (array of events)
     future: [],                       // redo stack
     log: []                           // full event log for CSV
@@ -244,6 +266,9 @@
       obj.coaches ||= [];
       obj.coachStats ||= {};
       obj.huddles ||= 0;
+      obj.huddlesByQuarter ||= {};
+      obj.activeQuarter ||= 1;
+      obj.totalsQuarterFilter ||= 'all';
       obj.history ||= [];
       obj.future ||= [];
       obj.log ||= [];
@@ -279,7 +304,8 @@
     const players = {};
     uniq.forEach(n => {
       const prev = S.players[n];
-      players[n] = prev ? {...prev} : { tags:0, misses:0, sm:0, defl:0, active:false };
+      players[n] = prev ? {...prev} : { tags:0, misses:0, sm:0, defl:0, active:false, quarters: {} };
+      players[n].quarters ||= {};
     });
 
     S.roster = uniq;
@@ -298,7 +324,8 @@
     const stats = {};
     uniq.forEach(n => {
       const prev = S.coachStats[n];
-      stats[n] = prev ? {...prev} : { tags:0, misses:0, sm:0 };
+      stats[n] = prev ? {...prev} : { tags:0, misses:0, sm:0, quarters: {} };
+      stats[n].quarters ||= {};
     });
 
     S.coaches = uniq;
@@ -319,9 +346,10 @@
 
   function resetGame() {
     if (!confirm('Reset tags/misses/deflections and clear the court?')) return;
-    Object.values(S.players).forEach(p => { p.tags=0; p.misses=0; p.sm=0; p.defl=0; p.active=false; });
-    Object.values(S.coachStats).forEach(p => { p.tags=0; p.misses=0; p.sm=0; });
+    Object.values(S.players).forEach(p => { p.tags=0; p.misses=0; p.sm=0; p.defl=0; p.active=false; p.quarters = {}; });
+    Object.values(S.coachStats).forEach(p => { p.tags=0; p.misses=0; p.sm=0; p.quarters = {}; });
     S.huddles = 0;
+    S.huddlesByQuarter = {};
     S.history = [];
     S.future = [];
     S.log = [];
@@ -342,6 +370,15 @@
     document.getElementById('undoBtn').classList.toggle('btn-disabled', S.history.length === 0);
     document.getElementById('redoBtn').classList.toggle('btn-disabled', S.future.length === 0);
 
+    document.querySelectorAll('.btn-quarter').forEach((btn, idx) => {
+      const q = idx + 1;
+      btn.classList.toggle('active', q === Number(S.activeQuarter));
+    });
+    document.querySelectorAll('.btn-filter').forEach((btn) => {
+      const label = btn.textContent || '';
+      const target = label === 'All' ? 'all' : Number(label.replace('Q',''));
+      btn.classList.toggle('active', target === S.totalsQuarterFilter);
+    });
 
     // Quick-sub prompt
     const prompt = document.getElementById('qsPrompt');
@@ -417,9 +454,13 @@
     // Totals table (sorted by tags desc)
     const body = document.getElementById('totalsBody');
     body.innerHTML = '';
+    const filterQuarter = S.totalsQuarterFilter;
     const rows = S.roster.map(name => {
-      const p = S.players[name] || {tags:0,misses:0,sm:0,defl:0};
-      const touches = p.tags||0, high = p.misses||0, sm = p.sm||0;
+      const p = S.players[name] || {tags:0,misses:0,sm:0,defl:0,quarters:{}};
+      const q = filterQuarter === 'all' ? null : getQuarterStats(p, filterQuarter);
+      const touches = q ? (q.tags||0) : (p.tags||0);
+      const high = q ? (q.misses||0) : (p.misses||0);
+      const sm = q ? (q.sm||0) : (p.sm||0);
       return { name, touches, high, sm };
     }).sort((a,b)=> b.touches - a.touches);
 
@@ -440,9 +481,12 @@
       td('', String(totalsHigh)),
       td('', String(totalsSm)),
     ]));
+    const huddleTotal = filterQuarter === 'all'
+      ? (S.huddles || 0)
+      : (S.huddlesByQuarter[filterQuarter] || 0);
     body.appendChild(tr([
       td('totalsName', 'Team Huddles'),
-      td('', String(S.huddles || 0)),
+      td('', String(huddleTotal)),
       td('', ''),
       td('', ''),
     ]));
@@ -450,8 +494,12 @@
     const coachBody = document.getElementById('coachTotalsBody');
     coachBody.innerHTML = '';
     const coachRows = S.coaches.map(name => {
-      const p = S.coachStats[name] || { tags:0, misses:0, sm:0 };
-      return { name, touches: p.tags || 0, high: p.misses || 0, sm: p.sm || 0 };
+      const p = S.coachStats[name] || { tags:0, misses:0, sm:0, quarters:{} };
+      const q = filterQuarter === 'all' ? null : getQuarterStats(p, filterQuarter);
+      const touches = q ? (q.tags||0) : (p.tags||0);
+      const high = q ? (q.misses||0) : (p.misses||0);
+      const sm = q ? (q.sm||0) : (p.sm||0);
+      return { name, touches, high, sm };
     }).sort((a,b)=> b.touches - a.touches);
     coachRows.forEach(r => {
       coachBody.appendChild(tr([
@@ -473,12 +521,20 @@
   }
 
   // ------- Actions & history (undo/redo) -------
+  function getQuarterStats(obj, quarter) {
+    if (!obj.quarters) obj.quarters = {};
+    if (!obj.quarters[quarter]) obj.quarters[quarter] = { tags:0, misses:0, sm:0 };
+    return obj.quarters[quarter];
+  }
+
   function doDelta(name, field, delta) {
     const p = S.players[name]; if (!p) return;
     // apply
     p[field] = Math.max(0, (Number(p[field])||0) + delta);
+    const q = getQuarterStats(p, S.activeQuarter);
+    q[field] = Math.max(0, (Number(q[field])||0) + delta);
     // log & history
-    const ev = { t:'delta', name, field, delta, ts: Date.now() };
+    const ev = { t:'delta', name, field, delta, quarter: S.activeQuarter, ts: Date.now() };
     S.history.push(ev);
     S.future = [];
     S.log.push(ev);
@@ -488,7 +544,9 @@
   function doCoachDelta(name, field, delta) {
     const p = S.coachStats[name]; if (!p) return;
     p[field] = Math.max(0, (Number(p[field])||0) + delta);
-    const ev = { t:'coach_delta', name, field, delta, ts: Date.now() };
+    const q = getQuarterStats(p, S.activeQuarter);
+    q[field] = Math.max(0, (Number(q[field])||0) + delta);
+    const ev = { t:'coach_delta', name, field, delta, quarter: S.activeQuarter, ts: Date.now() };
     S.history.push(ev);
     S.future = [];
     S.log.push(ev);
@@ -500,10 +558,15 @@
     if (active.length === 0) return;
     active.forEach(name => {
       const p = S.players[name];
-      if (p) p.tags = Math.max(0, (Number(p.tags) || 0) + 1);
+      if (p) {
+        p.tags = Math.max(0, (Number(p.tags) || 0) + 1);
+        const q = getQuarterStats(p, S.activeQuarter);
+        q.tags = Math.max(0, (Number(q.tags) || 0) + 1);
+      }
     });
     S.huddles = (S.huddles || 0) + 1;
-    const ev = { t:'huddle', active, ts: Date.now() };
+    S.huddlesByQuarter[S.activeQuarter] = (S.huddlesByQuarter[S.activeQuarter] || 0) + 1;
+    const ev = { t:'huddle', active, quarter: S.activeQuarter, ts: Date.now() };
     S.history.push(ev);
     S.future = [];
     S.log.push(ev);
@@ -539,11 +602,19 @@
     if (ev.t === 'delta') {
       inv = { ...ev, delta: -ev.delta, ts: Date.now() };
       const p = S.players[ev.name];
-      if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
+      if (p) {
+        p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
+        const q = getQuarterStats(p, ev.quarter);
+        q[ev.field] = Math.max(0, (Number(q[ev.field])||0) - ev.delta);
+      }
     } else if (ev.t === 'coach_delta') {
       inv = { ...ev, delta: -ev.delta, ts: Date.now() };
       const p = S.coachStats[ev.name];
-      if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
+      if (p) {
+        p[ev.field] = Math.max(0, (Number(p[ev.field])||0) - ev.delta);
+        const q = getQuarterStats(p, ev.quarter);
+        q[ev.field] = Math.max(0, (Number(q[ev.field])||0) - ev.delta);
+      }
     } else if (ev.t === 'sub') {
       inv = { t:'sub', out: ev.in, in: ev.out, ts: Date.now() };
       const outP = S.players[ev.in], inP = S.players[ev.out];
@@ -552,9 +623,16 @@
       inv = { t:'huddle', active: ev.active || [], ts: Date.now() };
       (ev.active || []).forEach(name => {
         const p = S.players[name];
-        if (p) p.tags = Math.max(0, (Number(p.tags) || 0) - 1);
+        if (p) {
+          p.tags = Math.max(0, (Number(p.tags) || 0) - 1);
+          const q = getQuarterStats(p, ev.quarter);
+          q.tags = Math.max(0, (Number(q.tags) || 0) - 1);
+        }
       });
       S.huddles = Math.max(0, (S.huddles || 0) - 1);
+      if (ev.quarter) {
+        S.huddlesByQuarter[ev.quarter] = Math.max(0, (S.huddlesByQuarter[ev.quarter] || 0) - 1);
+      }
     }
     if (inv) {
       S.future.push(ev);
@@ -568,17 +646,32 @@
     const ev = S.future.pop();
     if (ev.t === 'delta') {
       const p = S.players[ev.name]; if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) + ev.delta);
+      if (p) {
+        const q = getQuarterStats(p, ev.quarter);
+        q[ev.field] = Math.max(0, (Number(q[ev.field])||0) + ev.delta);
+      }
     } else if (ev.t === 'coach_delta') {
       const p = S.coachStats[ev.name]; if (p) p[ev.field] = Math.max(0, (Number(p[ev.field])||0) + ev.delta);
+      if (p) {
+        const q = getQuarterStats(p, ev.quarter);
+        q[ev.field] = Math.max(0, (Number(q[ev.field])||0) + ev.delta);
+      }
     } else if (ev.t === 'sub') {
       const outP = S.players[ev.out], inP = S.players[ev.in];
       if (outP && inP) { outP.active=false; inP.active=true; }
     } else if (ev.t === 'huddle') {
       (ev.active || []).forEach(name => {
         const p = S.players[name];
-        if (p) p.tags = Math.max(0, (Number(p.tags) || 0) + 1);
+        if (p) {
+          p.tags = Math.max(0, (Number(p.tags) || 0) + 1);
+          const q = getQuarterStats(p, ev.quarter);
+          q.tags = Math.max(0, (Number(q.tags) || 0) + 1);
+        }
       });
       S.huddles = (S.huddles || 0) + 1;
+      if (ev.quarter) {
+        S.huddlesByQuarter[ev.quarter] = (S.huddlesByQuarter[ev.quarter] || 0) + 1;
+      }
     }
     S.history.push(ev);
     S.log.push({ t:'redo', of:ev, ts: Date.now() });
@@ -614,6 +707,16 @@
   }
 
   function csv(s) { return (''+s).replaceAll('"','""'); }
+
+  function setQuarter(q) {
+    S.activeQuarter = q;
+    markDirty(); persist(); render();
+  }
+
+  function setTotalsFilter(q) {
+    S.totalsQuarterFilter = q;
+    markDirty(); persist(); render();
+  }
 
   // ------- tiny DOM helpers -------
   function el(tag, attrs={}, children=[]) {
