@@ -70,6 +70,13 @@
     grid-template-rows: 1fr 1fr;
     gap:12px;
   }
+  .actionStackSingle {
+    display:flex;
+    height:100%;
+  }
+  .actionStackSingle .btn {
+    height:100%;
+  }
   .actionStackRight {
     display:grid;
     grid-template-rows: 1fr auto;
@@ -357,7 +364,6 @@
       const p = S.players[name];
       const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
       const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); doDelta(name,'misses',+1); });
-      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
       const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doDelta(name,'sm',+1); });
       const card = div('card', {
         onclick: ()=> maybeCompleteQuickSubOut(name)
@@ -366,7 +372,7 @@
           div('name', {}, name),
           div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
         ]),
-        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])])
+        div('bar2', {}, [div('actionStackSingle', {}, [tagBtn]), div('actionStackRight', {}, [highBtn, smBtn])])
       ]);
       col.appendChild(card);
     });
@@ -378,14 +384,13 @@
       const p = S.players[name];
       const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+1); });
       const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); doDelta(name,'misses',+1); });
-      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doDelta(name,'tags',+2); });
       const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doDelta(name,'sm',+1); });
       const card = div('card bench-card', { onclick: ()=>quickSubStart(name) }, [
         div('nameRow', {}, [
           div('name', {}, name),
           div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
         ]),
-        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])]),
+        div('bar2', {}, [div('actionStackSingle', {}, [tagBtn]), div('actionStackRight', {}, [highBtn, smBtn])]),
         div('benchNote', {}, 'Tap card to sub in')
       ]);
       dock.appendChild(card);
@@ -398,14 +403,13 @@
       const p = S.coachStats[name] || { tags:0, misses:0, sm:0 };
       const tagBtn  = button('btn btn-tag btn-primary', '1', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+1); });
       const highBtn = button('btn btn-high', 'High', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+2); doCoachDelta(name,'misses',+1); });
-      const missBtn = button('btn btn-miss btn-slim', '2', (e)=>{ e.stopPropagation(); doCoachDelta(name,'tags',+2); });
       const smBtn   = button('btn btn-miss btn-smaction btn-slim', 'sm', (e)=>{ e.stopPropagation(); doCoachDelta(name,'sm',+1); });
       const card = div('card coach-card', {}, [
         div('nameRow', {}, [
           div('name', {}, name),
           div('inlineStats', {}, `· ${p.tags} Touches | ${p.misses} High`)
         ]),
-        div('bar2', {}, [div('actionStack', {}, [tagBtn, highBtn]), div('actionStackRight', {}, [missBtn, smBtn])])
+        div('bar2', {}, [div('actionStackSingle', {}, [tagBtn]), div('actionStackRight', {}, [highBtn, smBtn])])
       ]);
       coachDock.appendChild(card);
     });
